@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Quiz Game — Trắc nghiệm ABCD</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: linear-gradient(135deg,#0f172a,#022c43); color: #e6eef8; font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
+    .card { background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border: 1px solid rgba(255,255,255,0.03); }
+    .choice { cursor:pointer; padding:12px; border-radius:8px; }
+    .choice:hover { transform: translateY(-2px); }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-6">
+  <div class="max-w-2xl w-full card p-6 rounded-2xl">
+    <h1 class="text-2xl font-bold mb-2">🎯 Quiz — Trắc nghiệm ABCD (Có tính giờ)</h1>
+    <div id="meta" class="text-sm text-slate-400 mb-4">Mỗi câu có <span id="timePer">10</span> giây</div>
+
+    <div id="gameArea">
+      <div id="questionBox" class="text-lg mb-4">...</div>
+      <div id="choices" class="grid grid-cols-1 gap-3 mb-4"></div>
+
+      <div class="flex items-center justify-between">
+        <div class="text-sm text-slate-300">Câu <span id="qIndex">1</span>/<span id="qTotal">4</span></div>
+        <div class="text-sm"><span id="timer">10</span>s còn lại</div>
+      </div>
+
+      <div class="mt-4 flex gap-2">
+        <button id="startBtn" class="px-3 py-2 rounded bg-emerald-500">Bắt đầu</button>
+        <button id="quitBtn" class="px-3 py-2 rounded bg-slate-700">Thoát</button>
+      </div>
+    </div>
+
+    <div id="result" class="hidden mt-4">
+      <div class="text-lg font-semibold">Kết thúc!</div>
+      <div class="mt-2">Điểm của bạn: <span id="scoreOut">0</span></div>
+      <div class="mt-2">
+        <input id="nameInput" class="w-full p-2 rounded bg-[#061624] mt-2" placeholder="Nhập tên hiển thị..." />
+        <button id="submitScore" class="w-full mt-3 px-3 py-2 rounded bg-indigo-600">Gửi điểm</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+const questions = [
+  {q:"Thủ đô của Nhật Bản là?", choices:["Osaka","Kyoto","Tokyo","Hiroshima"], a:2},
+  {q:"2 + 2 × 2 = ?", choices:["6","8","4","10"], a:0},
+  {q:"Quốc gia có tháp Eiffel?", choices:["Italy","Spain","France","Germany"], a:2},
+  {q:"Loại ngôn ngữ phổ biến cho frontend?", choices:["Python","JavaScript","C++","Go"], a:1}
+];
+
+let current=0, score=0, timer=null;
+const timePerQ = 10;
+
+function showQuestion(i){
+  const q = questions[i];
+  document.getElementById('questionBox').textContent = q.q;
+  const ch = document.getElementById('choices');
+  ch.innerHTML = '';
+  q.choices.forEach((c, idx)=>{
+    const d = document.createElement('div');
+    d.className = 'choice p-3 bg-[#081226] rounded border border-transparent';
+    d.textContent = String.fromCharCode(65+idx) + '. ' + c;
+    d.addEventListener('click', ()=> selectChoice(idx));
+    ch.appendChild(d);
+  });
+  document.getElementById('qIndex').textContent = i+1;
+  document.getElementById('qTotal').textContent = questions.length;
+  startTimer();
+}
+
+function startTimer(){
+  let t = timePerQ;
+  document.getElementById('timer').textContent = t;
+  clearInterval(timer);
+  timer = setInterval(()=>{
+    t--;
+    document.getElementById('timer').textContent = t;
+    if(t<=0){ clearInterval(timer); // time out -> next
+      nextQuestion();
+    }
+  },1000);
+}
+
+function selectChoice(idx){
+  clearInterval(timer);
+  const q = questions[current];
+  if(idx === q.a){ score += 10; } // each correct 10 points
+  nextQuestion();
+}
+
+function nextQuestion(){
+  current++;
+  if(current >= questions.length){
+    endGame();
+  } else showQuestion(current);
+}
+
+function endGame(){
+  clearInterval(timer);
+  document.getElementById('gameArea').classList.add('hidden');
+  document.getElementById('result').classList.remove('hidden');
+  document.getElementById('scoreOut').textContent = score;
+  // send score to parent for leaderboard update (also parent will prompt name)
+  try{ window.parent.postMessage({type:'score', score: score, game:'quiz'}, '*'); }catch(e){}
+}
+
+document.getElementById('startBtn').addEventListener('click', ()=>{
+  current=0; score=0;
+  document.getElementById('gameArea').classList.remove('hidden');
+  document.getElementById('result').classList.add('hidden');
+  showQuestion(0);
+});
+document.getElementById('quitBtn').addEventListener('click', ()=> {
+  try{ window.parent.postMessage({type:'quit'}, '*'); }catch(e){} 
+  window.close();
+});
+
+document.getElementById('submitScore').addEventListener('click', async ()=>{
+  const name = document.getElementById('nameInput').value.trim() || 'Player';
+  try{
+    await fetch('/api/game/submit', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, score, game:'quiz'})});
+    alert('Điểm đã gửi: ' + score);
+  }catch(e){
+    alert('Lỗi khi gửi: ' + e.message);
+  }
+});
+</script>
+</body>
+</html>

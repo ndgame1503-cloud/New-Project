@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>My Social Site - Fullstack Demo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: linear-gradient(180deg,#030313,#071029); color:#e6eef8; }
+    .card { background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border: 1px solid rgba(255,255,255,0.03); }
+  </style>
+</head>
+<body class="min-h-screen">
+  <header class="p-4 max-w-5xl mx-auto flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-12 h-12 rounded-lg bg-gradient-to-br from-purple-600 to-indigo-500 flex items-center justify-center text-white font-bold">MS</div>
+      <h1 class="text-2xl font-semibold">My Social Site</h1>
+    </div>
+    <div class="text-sm text-slate-400">Chế độ demo — không cần đăng nhập</div>
+  </header>
+
+  <main class="max-w-5xl mx-auto p-4 grid grid-cols-1 md:grid-cols-3 gap-6">
+    <section class="md:col-span-2 space-y-4">
+      <div class="card p-4 rounded-lg">
+        <div class="flex justify-between items-center mb-3">
+          <h2 class="text-lg font-semibold">Tạo bài viết</h2>
+          <small class="text-slate-400">Bạn cần đăng nhập để đăng bài</small>
+        </div>
+        <textarea id="postContent" class="w-full p-3 rounded bg-[#081226]" rows="3"></textarea>
+        <div class="flex justify-between items-center mt-2">
+          <input id="imageUpload" type="file" multiple class="text-sm text-slate-400"/>
+          <button id="addPostBtn" class="px-3 py-1 rounded bg-amber-500 text-black font-semibold">Đăng</button>
+        </div>
+      </div>
+
+      <div id="postsList" class="space-y-4"></div>
+    </section>
+
+    <aside class="space-y-4">
+      <div class="card p-4 rounded-lg">
+        <h3 class="text-lg font-semibold mb-2">Games</h3>
+        <div class="space-y-3">
+          <div class="flex gap-2">
+            <button id="openNumber" class="px-3 py-1 rounded bg-indigo-600">Chơi Number Game</button>
+            <button id="openQuiz" class="px-3 py-1 rounded bg-violet-600">Chơi Quiz (ABCD)</button>
+            <button id="openFull" class="px-3 py-1 rounded bg-slate-700">Mở trong trang</button>
+          </div>
+          <div class="aspect-video rounded overflow-hidden bg-black">
+            <iframe id="gameFrame" src="/Game006.html" class="w-full h-full" title="Game Frame"></iframe>
+          </div>
+          <div class="mt-2 flex gap-2">
+            <button id="submitScore" class="px-3 py-1 rounded bg-emerald-500">Gửi điểm thủ công</button>
+            <button id="refreshBoards" class="px-3 py-1 rounded bg-slate-700">Cập nhật BXH</button>
+          </div>
+          <div class="mt-3 grid grid-cols-1 gap-2">
+            <div class="p-2 bg-[#081226] rounded">
+              <div class="font-semibold text-sm">Leaderboard — Number Game</div>
+              <div id="leaderboard-number" class="mt-2"></div>
+            </div>
+            <div class="p-2 bg-[#081226] rounded">
+              <div class="font-semibold text-sm">Leaderboard — Quiz Game</div>
+              <div id="leaderboard-quiz" class="mt-2"></div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+
+      <div class="card p-4 rounded-lg">
+        <h3 class="text-lg font-semibold mb-2">Câu hỏi mỗi ngày</h3>
+        <div id="questionBox" class="mb-2 text-slate-200">...</div>
+        <input id="answerInput" class="w-full p-2 rounded bg-[#081226]" placeholder="Nhập đáp án..." />
+        <button id="submitAnswer" class="w-full mt-2 px-3 py-2 rounded bg-purple-600">Gửi đáp án</button>
+        <div id="qStatus" class="mt-2 text-sm text-slate-400"></div>
+      </div>
+
+      <div class="card p-4 rounded-lg">
+        <h3 class="text-lg font-semibold mb-2">Leaderboard</h3>
+        <div id="leaderboard" class="space-y-2 text-sm"></div>
+      </div>
+    </aside>
+  </main>
+
+<script>
+/* Simple client JS to interact with backend */
+const API = location.origin;
+let token = localStorage.getItem('token') || null;
+function setAuth(t){
+  token = t;
+  if(t){ localStorage.setItem('token', t); document.getElementById('btnLogin').classList.add('hidden'); document.getElementById('btnLogout').classList.remove('hidden'); }
+  else{ localStorage.removeItem('token'); document.getElementById('btnLogin').classList.remove('hidden'); document.getElementById('btnLogout').classList.add('hidden'); }
+}
+setAuth(token);
+
+
+
+async function loadPosts(){
+  const r = await fetch(API + '/api/posts');
+  const posts = await r.json();
+  const el = document.getElementById('postsList');
+  el.innerHTML = posts.map(p=>`<article class="p-4 rounded-lg"><div class="text-slate-400 text-sm">${new Date(p.created).toLocaleString()}</div><div class="mt-2">${p.content}</div>${p.images? p.images.map(i=>`<img src="${i}" class="mt-2 max-w-full rounded">`).join(''):''}</article>`).join('');
+}
+loadPosts();
+
+document.getElementById('addPostBtn').addEventListener('click', async ()=>{
+  if(!token){ alert('Bạn cần đăng nhập để đăng bài.'); return; }
+  const content = document.getElementById('postContent').value.trim();
+  const input = document.getElementById('imageUpload');
+  const form = new FormData();
+  form.append('content', content);
+  for(const f of input.files) form.append('images', f);
+  const r = await fetch(API + '/api/posts', { method:'POST', headers: { 'Authorization': 'Bearer '+token }, body: form });
+  const data = await r.json();
+  if(data.ok){ alert('Đã đăng'); document.getElementById('postContent').value=''; loadPosts(); } else alert('Lỗi: '+JSON.stringify(data));
+});
+
+// Game score bridge (listen to postMessage from iframe)
+window.addEventListener('message', async (ev)=>{
+  if(ev.data && ev.data.type === 'score'){
+    const score = ev.data.score;
+    const game = ev.data.game || 'number';
+    const name = prompt('Nhập tên hiển thị để gửi điểm (tùy chọn):','Người chơi');
+    await fetch(API + '/api/game/submit', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name,score, game})});
+    alert('Điểm đã gửi: '+score);
+    loadLeaderboards();
+  }
+  if(ev.data && ev.data.type === 'quit'){
+    // handle iframe quit if needed
+  }
+});
+
+document.getElementById('submitScore').addEventListener('click', async ()=>{ const game = prompt('Game (number/quiz):','number') || 'number';
+  const score = prompt('Nhập điểm của bạn (số):','0');
+  if(score!==null){
+    await fetch(API + '/api/game/submit', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name:'Player', score:Number(score), game:game})});
+    alert('Đã gửi điểm');
+    loadLeaderboard();
+  }
+});
+
+async function loadLeaderboards(){
+    // fetch for number and quiz leaderboards
+  const r1 = await fetch(API + '/api/game/leaderboard?game=number');
+  const l1 = await r1.json();
+  const el1 = document.getElementById('leaderboard-number');
+  el1.innerHTML = l1.map((p,i)=>`<div class="flex justify-between p-2 bg-[#081226] rounded">${i+1}. <span>${p.name}</span><span class="font-semibold">${p.score}</span></div>`).join('');
+  const r2 = await fetch(API + '/api/game/leaderboard?game=quiz');
+  const l2 = await r2.json();
+  const el2 = document.getElementById('leaderboard-quiz');
+  el2.innerHTML = l2.map((p,i)=>`<div class="flex justify-between p-2 bg-[#081226] rounded">${i+1}. <span>${p.name}</span><span class="font-semibold">${p.score}</span></div>`).join('');
+}
+loadLeaderboards();
+
+async function loadQuestion(){
+  const r = await fetch(API + '/api/questions/today');
+  const js = await r.json();
+  document.getElementById('questionBox').textContent = js.question;
+  document.getElementById('submitAnswer').onclick = async ()=>{
+    const ans = document.getElementById('answerInput').value.trim();
+    if(!ans) return alert('Nhập đáp án');
+    const res = await fetch(API + '/api/questions/answer', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({dayIndex: js.dayIndex, answer: ans, name: 'Guest'})});
+    const data = await res.json();
+    if(data.ok) { if(data.correct) alert('Đúng!'); else alert('Sai!'); }
+    else alert('Lỗi: '+(data.error||JSON.stringify(data)));
+  }
+}
+loadQuestion();
+</script>
+</body>
+</html>
